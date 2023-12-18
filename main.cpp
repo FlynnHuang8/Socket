@@ -1,119 +1,127 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 #include <unistd.h>
-#include <cstdlib>
-#include "smallsh.h"
-//程序缓冲区和指针
-static char inputBuf[MAXBUF], tokBuf[MAXBUF], *ptr = inputBuf, *tok = tokBuf;
-int inarg(char c);
-int runcommand(char **cline, int where);
-/**
-用户输入函数
- **/
-int userIn(char *p) {
-  int c, count;
-  ptr = inputBuf;
-  tok = tokBuf;
-  //显示提示
-  printf("%s", p);
-  for (count = 0;;) {
-    if ((c = getchar()) == EOF) {
-      return EOF;
-    }
-    if (count < MAXBUF) {
-      inputBuf[count++] = c;
-    }
-    if (c == '\n' && count < MAXBUF) {
-      inputBuf[count] = '\n';
-      return count;
-    }
-    if (c == '\n') {
-      printf("smallsh: input line too long\n");
-      count = 0;
-      printf("%s", p);
-    }
-  }
-}
-int getTok(char *output) {
-  int type;
-  for (; *ptr == ' ' || *ptr == '\t'; *ptr++);
-  *tok++ = *ptr;
-  switch (*ptr) {
-    case '\n':type = EOL;
-      break;
-    case '&':type = AMPERSAND;
-      break;
-    case ';':type = SEMICOLON;
-      break;
-    default:type = ARG;
-      while (inarg(*ptr))
-        *tok++ = *ptr++;
-  }
-  *tok++ = '\0';
-  return type;
+
+void function_remove(char *s) {
+  char *s0= s;
+  int j,i= 0;
+  for (j=0;s[j]!='\0';j++) {
+    if (s[j] != '\"') {
+      s0[i++] =s[j];}}
+  s0[i]= '\0';
+  s= reinterpret_cast<char *>(1);
 }
 
-static char special[] = {' ', '\t', '*', ';', ',', '\n', '\0'};
+int function_judge(const char *s) {
+  int t = 0;
+  for (int j = 0; s[j] != '\0';j++) {
+    if (s[j] == '\"') {
+      t++;}}
+  return t%2 == 0;}
 
-int inarg(char c) {
-  char *wrk;
-  for (wrk = special; *wrk != '\0'; wrk++) {
-    if (c == *wrk) {
-      return 0;
+
+struct word_item {
+  char* word;
+  struct word_item* next;};
+
+struct word_item* function_split(const char *s) {
+  struct word_item *head = NULL;
+  struct word_item *current = NULL;
+  while (*s!= '\0') {
+    while (isspace(*s)) {
+      s++;}
+    if (*s == '\0') {
+      break;}
+
+    const char *begin = NULL;
+    const char *finish = NULL;
+    int r = 0;
+    while (*s != '\0' && (r|| !isspace(*s))) {
+      if (*s == '\"') {
+        r= !r;}
+      if (begin == NULL && *s != '\"') {
+        begin = s;}
+      if (*s != '\"') {
+        finish = s;}
+      s++;}
+    int length = finish - begin + 1;
+    char *token = (char *)malloc(length + 1);
+    strncpy(token,begin, length);
+    token[length] = '\0';
+    function_remove(token);
+    struct word_item *new_item = (struct word_item *)malloc(sizeof(struct word_item));
+    new_item->word = token;
+    new_item->next = NULL;
+    if (head == NULL) {
+      head = new_item;
+      current = new_item;
+    } else {
+      current->next = new_item;
+      current = new_item;}}
+  return head;
+}
+void function_printf(struct word_item *head) {
+  struct word_item *current = head;
+  while (current != NULL) {
+    printf("[%s]\n", current->word);
+    current = current->next;}}
+
+void function_free(struct word_item *head) {
+  struct word_item *current = head;
+  while (current != NULL) {
+    struct word_item *tmp = current;
+    current = current->next;
+    free(tmp->word);
+    free(tmp);}}
+
+int main() {
+  char line0[100];
+  while (fgets(line0, 100 , stdin)) {
+    line0[strcspn(line0, "\n")] = '\0';
+    if (!function_judge(line0)) {
+      printf("Error: unmatched quotes\n");
+      continue;
     }
-  }
-  return 1;
-}
+    struct word_item *words = function_split(line0);
 
-void procLine() {
-  char *arg[MAXARG + 1];
-  int tokType;
-  int narg;
-  int type;
-  for (narg = 0;;) {
-    // ?
-    switch (tokType = getTok(arg[narg])) {
-      case ARG:
-        if (narg < MAXARG)
-          narg++;
-        break;
-      case EOL:
-      case SEMICOLON:
-      case AMPERSAND:type = (tokType == AMPERSAND) ? BACKGROUND : FOREGROUND;
-        if (narg != 0) {
-          arg[narg] = NULL;
-          runcommand(arg, type);
-        }
-        if (tokType == EOL)
-          return;
-        narg = 0;
-        break;
+    int count = 0;
+    struct word_item *current = words;
+    while (current != NULL) {
+      count++;
+      current = current->next;
     }
-  }
-}
 
-int runcommand(char **cline, int where) {
-  int pid, exitStat, ret;
-  if ((pid = fork()) < 0) {
-    perror("fork fail");
-    return -1;
-  }
-  if (!pid) {
-    execvp(*cline, cline);
-    perror(*cline);
-    exit(127);
-  }
-  if (where == BACKGROUND) {
-    printf("[process id %d ]\n", pid);
-    return 0;
-  }
+    // 创建字符串数组
+    char **args = static_cast<char **>(malloc((count + 1) * sizeof(char *)));
+    current = words;
+    int i = 0;
+    while (current != NULL) {
+      args[i++] = current->word;
+      current = current->next;
+    }
+    args[i] = NULL; // 以 NULL 结尾
 
-  while ((ret = wait(&exitStat)) != pid && ret != -1);
-  return ret == -1 ? -1 : exitStat;
-}
+    // 创建子进程并在其中执行命令
+    pid_t pid = fork();
+    if (pid == 0) {
+      // 子进程
+      if (execvp(args[0], args) == -1) {
+        printf("Error: command not found\n");
+        exit(EXIT_FAILURE);
+      }
+    } else if (pid > 0) {
+      // 父进程
+      int status;
+      wait(&status); // 等待子进程结束
+    } else {
+      // fork 失败
+      printf("Error: fork failed\n");
+    }
 
-char *prompt = "command>";
-int main(){
-  while(userIn(prompt) != EOF)
-    procLine();
-
+    free(args); // 释放 args 数组
+    function_free(words); // 清理链表
+  }
   return 0;
 }
