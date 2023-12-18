@@ -1,0 +1,1 @@
+//// Created by 黄洪飞 on 2023/12/15.//#ifndef ROBATS__SMALLSH_H_#define ROBATS__SMALLSH_H_#include <stdio.h>#define EOL 1#define ARG 2#define AMPERSAND 3#define SEMICOLON 4#define MAXARG 512#define MAXBUF 512#define FOREGROUND 0#define BACKGROUND 1#endif //ROBATS__SMALLSH_H_
