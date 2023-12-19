@@ -1,1 +1,1 @@
-//// Created by 黄洪飞 on 2023/12/18.//
+//// Created by 黄洪飞 on 2023/12/18.//#include <stdio.h>#include <unistd.h>#include "findenv.h"int main() {  char *argv[] = {"showenv", NULL},      *envp[] = {"foo=bar", "bar=foo", NULL};  execve("./showenv", argv, envp);  perror("exeve fail.");  return 0;}
