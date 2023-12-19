@@ -1,0 +1,1 @@
+#include <stdio.h>#include <string.h>extern char **environ;int pCmp(char *name, char *p);char *findEnv(char *name);
